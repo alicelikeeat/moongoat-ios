@@ -1,0 +1,166 @@
+import SwiftUI
+import MoonGoatCore
+import PhotosUI
+
+struct ContentView: View {
+    @ObservedObject var model: GameModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var cards
+    @State private var showStudio = false
+    @State private var showNew = false
+    @State private var showHelp = false
+    var body: some View {
+        GeometryReader { _ in
+            ZStack {
+                LinearGradient(colors: [Color(red: 0.08, green: 0.13, blue: 0.19), Color(red: 0.16, green: 0.13, blue: 0.25), Color(red: 0.06, green: 0.22, blue: 0.23)], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
+                Circle().fill(.purple.opacity(0.19)).blur(radius: 65).frame(width: 230).offset(x: 140, y: -230)
+                BubbleField(burst: model.celebration).ignoresSafeArea()
+                VStack(spacing: 18) {
+                    header
+                    progress
+                    board.frame(maxHeight: .infinity)
+                    tray
+                    controls
+                    Text("三张相同即消除 · 七格装满则结束")
+                        .font(.caption2).foregroundStyle(.white.opacity(0.55))
+                }
+                .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 10)
+                .frame(maxWidth: 520).frame(maxWidth: .infinity)
+                if model.game.state.status != .playing { result }
+            }
+            .animation(reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.8), value: model.game.state)
+            .animation(reduceMotion ? nil : .easeInOut, value: model.hintID)
+        }
+        .sheet(isPresented: $showStudio) { FaceStudio(model: model).presentationDetents([.large]) }
+        .sheet(isPresented: $showHelp) { help.presentationDetents([.medium]) }
+        .confirmationDialog("开始新局？当前进度将替换。", isPresented: $showNew, titleVisibility: .visible) {
+            Button("轻松 · 36 张") { model.newGame(rows: 3) }
+            Button("标准 · 48 张") { model.newGame(rows: 4) }
+            Button("挑战 · 60 张") { model.newGame(rows: 5) }
+        }
+        .alert("MoonGoat", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
+            Button("知道了") { model.notice = nil }
+        } message: { Text(model.notice ?? "") }
+    }
+    private var header: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("MOONGOAT").font(.system(size: 12, weight: .bold, design: .rounded)).tracking(4).foregroundStyle(.mint)
+                Text("月下消消羊").font(.system(size: 28, weight: .bold, design: .rounded))
+            }
+            Spacer()
+            Button { showHelp = true } label: { Image(systemName: "questionmark").frame(width: 44, height: 44).moonGlass(radius: 22) }.accessibilityLabel("玩法说明")
+            Button { showStudio = true } label: { Image(systemName: "paintpalette").frame(width: 44, height: 44).moonGlass(radius: 22) }.accessibilityLabel("打开牌面工作室")
+        }.foregroundStyle(.white)
+    }
+    private var progress: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "moon.stars.fill").foregroundStyle(.mint).symbolEffect(.bounce, value: model.celebration)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(model.theme.title).fontWeight(.medium)
+                    Spacer()
+                    Text("\(model.game.state.matched) / \(model.game.state.matched + model.game.state.board.count + model.game.state.tray.count)").monospacedDigit()
+                }.font(.caption)
+                ProgressView(value: Double(model.game.state.matched), total: Double(model.game.state.matched + model.game.state.board.count + model.game.state.tray.count)).tint(.mint)
+            }
+        }.padding(16).moonGlass()
+    }
+    private var board: some View {
+        GeometryReader { proxy in
+            let rows = (model.game.state.board.count + model.game.state.tray.count + model.game.state.matched) / 12
+            let maxY = Double(rows - 1) * 1.08 + 0.44
+            let unit = min((proxy.size.width - 12) / 4.64, (proxy.size.height - 8) / (maxY + 1.0))
+            let offsetX = (proxy.size.width - unit * 4.64) / 2
+            ZStack(alignment: .topLeading) {
+                Color.clear
+                ForEach(model.game.state.board.sorted { $0.layer < $1.layer }) { card in
+                    let available = model.game.isAvailable(card.id)
+                    Button { model.pick(card.id) } label: {
+                        face(card.kind)
+                            .frame(width: unit * 0.96, height: unit * 0.96)
+                            .background(available ? Color(red: 0.9, green: 0.95, blue: 0.88) : Color(red: 0.38, green: 0.45, blue: 0.45), in: .rect(cornerRadius: 13))
+                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(model.hintID == card.id ? .mint : .white.opacity(available ? 0.6 : 0.1), lineWidth: model.hintID == card.id ? 3 : 1))
+                            .shadow(color: .black.opacity(0.3), radius: 3, y: 5)
+                            .opacity(available ? 1 : 0.7)
+                    }
+                    .buttonStyle(.plain).disabled(!available || model.game.state.status != .playing)
+                    .matchedGeometryEffect(id: card.id, in: cards)
+                    .position(x: offsetX + (card.x + 0.48) * unit, y: (card.y + 0.48) * unit)
+                    .zIndex(Double(card.layer))
+                    .accessibilityLabel("\(model.theme.symbols[card.kind])牌，\(available ? "可选择" : "被覆盖")")
+                }
+            }
+        }
+    }
+    private var tray: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("月光收集槽").font(.caption).foregroundStyle(.white.opacity(0.7))
+                Spacer()
+                Text("\(model.game.state.tray.count) / 7").font(.caption.monospacedDigit()).foregroundStyle(model.game.state.tray.count >= 5 ? .orange : .mint)
+            }
+            GeometryReader { proxy in
+                let size = (proxy.size.width - 24) / 7
+                HStack(spacing: 4) {
+                    ForEach(0..<7, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: 9).fill(.black.opacity(0.15)).frame(width: size, height: size)
+                    }
+                }
+                HStack(spacing: 4) {
+                    ForEach(model.game.state.tray) { card in
+                        face(card.kind).frame(width: size, height: size)
+                            .background(Color(red: 0.9, green: 0.95, blue: 0.88), in: .rect(cornerRadius: 9))
+                            .matchedGeometryEffect(id: card.id, in: cards)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+            }.frame(height: 45)
+        }.padding(16).moonGlass()
+        .overlay { MatchBurst(trigger: model.celebration) }
+        .sensoryFeedback(.success, trigger: model.celebration) { _, _ in model.haptics }
+    }
+    private var controls: some View {
+        HStack(spacing: 10) {
+            tool("撤回", icon: "arrow.uturn.backward", disabled: !model.game.canUndo) { model.undo() }
+            tool("洗牌 \(model.game.state.shufflesLeft)", icon: "shuffle", disabled: model.game.state.shufflesLeft == 0 || model.game.state.status != .playing) { model.shuffle() }
+            tool("提示", icon: "sparkles", disabled: model.game.state.status != .playing) { model.hint() }
+            tool("新局", icon: "arrow.clockwise") { showNew = true }
+        }
+    }
+    private func tool(_ title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 7) { Image(systemName: icon).font(.title3); Text(title).font(.caption2) }
+                .frame(maxWidth: .infinity).frame(minHeight: 66).moonGlass(radius: 20)
+        }.buttonStyle(.plain).foregroundStyle(disabled ? .white.opacity(0.3) : .white).disabled(disabled)
+    }
+    private func face(_ kind: Int) -> some View {
+        Group {
+            if let image = model.customFaces[kind] { Image(uiImage: image).resizable().scaledToFit().padding(5) }
+            else { Text(model.theme.symbols[kind]).font(.system(size: 29)).minimumScaleFactor(0.5) }
+        }
+    }
+    private var result: some View {
+        ZStack {
+            Color.black.opacity(0.55).ignoresSafeArea()
+            VStack(spacing: 20) {
+                Text(model.game.state.status == .won ? "🌙" : "☁️").font(.system(size: 64))
+                Text(model.game.state.status == .won ? "今晚，你点亮了月亮" : "收集槽装满啦").font(.title2.bold())
+                Text(model.game.state.status == .won ? "让下一场月光，继续发生。" : "撤回一步，或换个思路重新出发。")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                Button("再来一局") { showNew = true }.buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
+                if model.game.canUndo { Button("撤回上一步") { model.undo() }.buttonStyle(.bordered) }
+                Button("更换牌面") { showStudio = true }.font(.caption)
+            }.padding(30).moonGlass(radius: 32).padding(24)
+        }
+    }
+    private var help: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("一小片月光，一点小策略").font(.title2.bold())
+            Text("点击未被上层覆盖的牌，将它放入七格收集槽。三张同类牌会自动消除；先消除，再判定满槽。清空所有牌即可通关。")
+            Text("提示会优先照顾槽中已有的牌，不是通关解法。初始牌局保证有解；洗牌后不保证。撤回可以恢复消除和洗牌。")
+                .font(.subheadline).foregroundStyle(.secondary)
+            Toggle("触感反馈", isOn: $model.haptics)
+        }.padding(28)
+    }
+}

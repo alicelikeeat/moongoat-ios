@@ -1,0 +1,27 @@
+name: iOS unsigned IPA
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Xcode
+        run: |
+          xcodebuild -version
+          python3 -c 'import subprocess; v=subprocess.check_output(["xcodebuild", "-version"], text=True); assert int(v.split()[1].split(".")[0]) >= 26, v'
+      - name: Build and package
+        run: ./tools/build_unsigned.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MoonGoat-unsigned
+          path: |
+            build/MoonGoat-unsigned.ipa
+            build/MoonGoat-unsigned.ipa.sha256
+          if-no-files-found: error
