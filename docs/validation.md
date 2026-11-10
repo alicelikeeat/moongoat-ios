@@ -44,4 +44,10 @@ Linux / Swift 6.1.2：20 项测试通过，覆盖原先 14 项规则/存档测�
 
 主要受影响接口：新增 `BoardIndex` / `BoardSnapshot` / `SavedSession` / `OrderedSessionStore`；GameModel.save 改为返回可等待的后台任务，后台切换调用 saveForBackground。规则接口和持久化 JSON 格式不变。主线程仅提交完整快照，IO actor 按 revision 拒绝过时写入。
 
-iOS 编译、macOS 基准与实际手机点击体验待验证。保留 108/240/360 牌数、20 类牌面和原生合并效果，不减少玩法规模。
+已通过 Xcode 26.6 的 arm64 Release 编译和 20 项 macOS 测试（构建 42750494827）；macOS 基准见本版本 benchmark.json，实际手机点击体验待验证。保留 108/240/360 牌数、20 类牌面和原生合并效果，不减少玩法规模。
+
+macOS CI 基准原始结果：
+
+```json
+{"checksum":306500,"flight_geometry_tiles":33,"indexed_ms_per_refresh":0.050181333333284783,"iterations":500,"old_ms_per_refresh":0.06380066666656603,"retained_tiles":187,"seed":2026,"tiles":360}
+```
