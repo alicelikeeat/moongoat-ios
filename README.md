@@ -41,7 +41,7 @@ SwiftUI iOS 26 API 放在 `compiler(>=6.2)` 与 `#available(iOS 26.0, *)` 分支
 
 **未签名 IPA 需要使用自己的证书签名才能在普通 iPhone 安装；不代表 App Store 或 TestFlight 包。**
 
-当前开发环境为 Linux，尚未执行 Xcode 构建、生成真实 IPA 或完成模拟器/真机验收。CI 工作流已编写，尚未在远端运行。不会将源码或空目录伪装成 IPA。
+已在 GitHub Actions 的 macOS / Xcode 26.6 / iOS SDK 26.5 上编译成功并生成真实未签名 IPA；8 项核心测试通过。安装包见 [成功构建](https://github.com/alicelikeeat/moongoat-ios/actions/runs/42743534742) 的 MoonGoat-unsigned artifact。模拟器交互及真机验收尚未完成。
 
 ## 测试
 
@@ -51,7 +51,7 @@ swift test
 
 8 项 XCTest 覆盖：100 Seed 确定性、100 Seed × 3 种大小的完整通关路线、遮挡失败零修改、三张消除/撤回/胜利、七格失败恢复、第七张先消除再判负、洗牌守恒与次数、存档序列化和非法数据拒绝。
 
-UI 代码仅在 Linux 通过 Swift 语法解析，尚未经 iOS SDK 类型检查。完整状态和风险见 [验收记录](docs/validation.md)。
+UI 代码已通过 Xcode 26.6 的 arm64 iPhoneOS Release 编译。完整状态和风险见 [验收记录](docs/validation.md)。
 
 ## 换牌
 

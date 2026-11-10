@@ -8,6 +8,7 @@ struct FaceStudio: View {
     @State private var selectedKind = 0
     @State private var importing = false
     var body: some View {
+        let pickerTitle = importing ? "正在导入…" : "为牌面 \(selectedKind + 1) 选择照片"
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -34,7 +35,7 @@ struct FaceStudio: View {
                         }
                     }
                     PhotosPicker(selection: $selection, matching: .images) {
-                        Label(importing ? "正在导入…" : "为牌面 \(selectedKind + 1) 选择照片", systemImage: "photo.badge.plus")
+                        Label(pickerTitle, systemImage: "photo.badge.plus")
                             .frame(maxWidth: .infinity).padding(10)
                     }.buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black).disabled(importing)
                     Text("图片仅在设备内处理，不上传。支持单帧图片，最大 10 MB / 4000 万像素，保存为 256 像素缩略图。请使用有权使用的图片。自定义牌面优先于主题，不改变游戏规则。")
