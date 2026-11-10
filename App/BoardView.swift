@@ -14,7 +14,7 @@ struct BoardView: View, Equatable {
     let animated: Bool
     let owner: ObjectIdentifier
     let onPick: (Int) -> Void
-    static func == (lhs: Self, rhs: Self) -> Bool {
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.snapshot == rhs.snapshot && lhs.bounds == rhs.bounds && lhs.theme == rhs.theme
             && lhs.faceRevision == rhs.faceRevision && lhs.hintID == rhs.hintID
             && lhs.namespace == rhs.namespace && lhs.animated == rhs.animated && lhs.owner == rhs.owner
@@ -52,7 +52,7 @@ private struct BoardTile: View, Equatable {
     let animated: Bool
     let owner: ObjectIdentifier
     let onPick: (Int) -> Void
-    static func == (lhs: Self, rhs: Self) -> Bool {
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.card == rhs.card && lhs.available == rhs.available && lhs.highlighted == rhs.highlighted
             && lhs.unit == rhs.unit && lhs.namespace == rhs.namespace && lhs.symbol == rhs.symbol
             && lhs.faceRevision == rhs.faceRevision && lhs.animated == rhs.animated && lhs.owner == rhs.owner

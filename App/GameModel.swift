@@ -209,7 +209,7 @@ import ImageIO
     }
 }
 
-enum FaceTheme: String, CaseIterable, Identifiable {
+enum FaceTheme: String, CaseIterable, Identifiable, Sendable {
     case meadow, cosmic, picnic
     var id: String { rawValue }
     var title: String { switch self { case .meadow: "月光牧场"; case .cosmic: "宇宙漫游"; case .picnic: "午后野餐" } }
