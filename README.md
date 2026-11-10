@@ -50,7 +50,7 @@ SwiftUI iOS 26 API 放在 `compiler(>=6.2)` 与 `#available(iOS 26.0, *)` 分支
 swift test
 ```
 
-14 项 XCTest 覆盖：100 Seed 确定性、100 Seed × 3 种大小的完整通关路线、遮挡失败零修改、三张消除/撤回/胜利、七格失败恢复、第七张先消除再判负、洗牌守恒与次数、存档序列化和非法数据拒绝；合并临时表现、反向分离数据、通关结算时机。
+20 项 XCTest 覆盖：100 Seed 确定性、100 Seed × 3 种大小的完整通关路线、遮挡失败零修改、三张消除/撤回/胜利、七格失败恢复、第七张先消除再判负、洗牌守恒与次数、存档序列化和非法数据拒绝；合并临时表现、反向分离数据、通关结算时机。
 
 UI 代码已通过 Xcode 26.6 的 arm64 iPhoneOS Release 编译。完整状态和风险见 [验收记录](docs/validation.md)。
 
@@ -87,3 +87,13 @@ Documents/MoonGoat/session.json 使用版本 1 的 JSON、原子替换。损坏�
 已有的 36/48/60 张旧存档照常恢复，不自动替换。安装更新后点击“新局”体验扩大牌池。原有前八类牌面 ID 与自定义图片保持对应，新增牌面也可在工作室替换。
 
 接口变化：`Game(seed:rows:)` 改为 `Game(seed:difficulty:)`，`BoardDifficulty` 定义三种规模；`GameState.boardBounds` 决定固定渲染边界。生成只影响新局，存档格式仍为 1，已有快照的坐标与类型不重新生成。
+
+## 0.1.3 点击和消除优化
+
+- `BoardIndex` 在牌局开始时预计算遮挡关系，`BoardSnapshot` 只在牌局内容变化时更新；动画阶段不重新扫描每张牌的遮挡。
+- 棋盘与单张牌使用独立可比较视图；只为可操作牌保留飞牌几何匹配，完全被同位置上层牌覆盖的牌不绘制，移除上层时恢复显示。
+- 去除数百张牌各自的模糊阴影，保留实体牌边；原生玻璃合并时暂停背景气泡漂移。
+- 消除输入锁定从约 770ms 缩短到 410ms；保持原生合并/撤回分离。
+- `OrderedSessionStore` actor 负责 JSON 编码与原子写入，按单调版本防止异步旧存档覆盖新存档；进入后台时申请短暂保存时间。存档格式保持 1。
+
+性能基准：`swiftc -O Sources/MoonGoatCore/*.swift tools/benchmark.swift -o /tmp/moongoat-benchmark && /tmp/moongoat-benchmark`。CI 产物附 `benchmark.json`。这是 CPU 计算微基准，不是设备帧率测量；真机流畅度仍需验证。

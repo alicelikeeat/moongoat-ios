@@ -16,7 +16,7 @@ struct ContentView: View {
             ZStack {
                 LinearGradient(colors: [Color(red: 0.08, green: 0.13, blue: 0.19), Color(red: 0.16, green: 0.13, blue: 0.25), Color(red: 0.06, green: 0.22, blue: 0.23)], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
                 Circle().fill(.purple.opacity(0.19)).blur(radius: 65).frame(width: 230).offset(x: 140, y: -230)
-                BubbleField().ignoresSafeArea()
+                BubbleField(pausedWhileInteracting: model.isAnimating).ignoresSafeArea()
                 VStack(spacing: 18) {
                     header
                     progress
@@ -70,32 +70,13 @@ struct ContentView: View {
         }.padding(16).moonGlass()
     }
     private var board: some View {
-        GeometryReader { proxy in
-            let bounds = model.visibleState.boardBounds
-            let unit = min((proxy.size.width - 8) / bounds.width, (proxy.size.height - 8) / bounds.height)
-            let offsetX = (proxy.size.width - unit * bounds.width) / 2
-            let offsetY = (proxy.size.height - unit * bounds.height) / 2
-            ZStack(alignment: .topLeading) {
-                Color.clear
-                ForEach(model.visibleState.board.sorted { $0.layer < $1.layer }) { card in
-                    let available = model.game.isAvailable(card.id)
-                    Button { model.pick(card.id, animated: !reduceMotion) } label: {
-                        face(card.kind, size: max(16, unit * 0.56))
-                            .frame(width: unit * 0.96, height: unit * 0.96)
-                            .background(available ? Color(red: 0.9, green: 0.95, blue: 0.88) : Color(red: 0.38, green: 0.45, blue: 0.45), in: .rect(cornerRadius: 13))
-                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(model.hintID == card.id ? .mint : .white.opacity(available ? 0.6 : 0.1), lineWidth: model.hintID == card.id ? 3 : 1))
-                            .background(RoundedRectangle(cornerRadius: 13).fill(Color(red: 0.29, green: 0.39, blue: 0.32)).offset(y: 3))
-                            .shadow(color: .black.opacity(0.35), radius: 1.5, y: 2)
-                            .opacity(available ? 1 : 0.7)
-                    }
-                    .buttonStyle(.plain).disabled(!available || model.visibleState.status != .playing || model.isAnimating)
-                    .matchedGeometryEffect(id: card.id, in: cards)
-                    .position(x: offsetX + (card.x + 0.48) * unit, y: offsetY + (card.y + 0.48) * unit)
-                    .zIndex(Double(card.layer))
-                    .accessibilityLabel("\(model.theme.symbols[card.kind])牌，\(available ? "可选择" : "被覆盖")")
-                }
-            }
+        BoardView(snapshot: model.boardSnapshot, bounds: model.visibleState.boardBounds,
+                  theme: model.theme, images: model.customFaces, faceRevision: model.faceRevision,
+                  hintID: model.hintID, namespace: cards, animated: !reduceMotion, owner: ObjectIdentifier(model)) { id in
+            model.pick(id, animated: !reduceMotion)
         }
+        .equatable()
+        .disabled(model.isAnimating || model.visibleState.status != .playing)
     }
     private var tray: some View {
         VStack(spacing: 12) {

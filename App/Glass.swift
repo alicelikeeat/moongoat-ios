@@ -89,10 +89,11 @@ private struct BubbleSurface: View {
     }
 }
 struct BubbleField: View {
+    var pausedWhileInteracting = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 20, paused: reduceMotion || scenePhase != .active)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 20, paused: reduceMotion || pausedWhileInteracting || scenePhase != .active)) { timeline in
             GeometryReader { proxy in
                 let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
                 NativeGlassGroup(spacing: 14) {

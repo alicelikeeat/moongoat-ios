@@ -7,6 +7,9 @@ if [[ "$(uname -s)" != Darwin ]] || ! command -v xcodebuild >/dev/null; then
 fi
 xcodebuild -version
 swift test
+mkdir -p build
+swiftc -O Sources/MoonGoatCore/*.swift tools/benchmark.swift -o build/board-benchmark
+build/board-benchmark > build/benchmark.json
 python3 tools/generate_project.py
 xcodebuild -project MoonGoat.xcodeproj -scheme MoonGoat -configuration Release \
     -destination 'generic/platform=iOS' -derivedDataPath build/DerivedData \

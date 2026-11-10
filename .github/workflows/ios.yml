@@ -24,4 +24,5 @@ jobs:
           path: |
             build/MoonGoat-unsigned.ipa
             build/MoonGoat-unsigned.ipa.sha256
+            build/benchmark.json
           if-no-files-found: error

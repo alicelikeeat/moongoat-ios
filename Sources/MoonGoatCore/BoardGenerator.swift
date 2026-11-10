@@ -11,7 +11,7 @@ public enum CardCatalog {
     public static let kindCount = 20
     public static let tileSize = 0.96
 }
-public struct BoardBounds: Sendable {
+public struct BoardBounds: Equatable, Sendable {
     public let width: Double
     public let height: Double
 }
