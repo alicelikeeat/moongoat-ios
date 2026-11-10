@@ -1,0 +1,62 @@
+name: Publish v0.1.1
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: release-v0.1.1
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v0.1.1
+      RELEASE_COMMIT: 866ee6101305bf64957047cef63a90cbd91fc8c4
+      VERIFIED_RUN: '42746968587'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source build and download artifact
+        run: |
+          gh run view "$VERIFIED_RUN" --repo "$GITHUB_REPOSITORY" --json conclusion,headSha > /tmp/source-run.json
+          python3 - <<'PY'
+          import json, os
+          run = json.load(open('/tmp/source-run.json'))
+          assert run['conclusion'] == 'success'
+          assert run['headSha'] == os.environ['RELEASE_COMMIT']
+          PY
+          gh run download "$VERIFIED_RUN" --repo "$GITHUB_REPOSITORY" --name MoonGoat-unsigned --dir dist
+      - name: Verify IPA and normalize checksum path
+        run: |
+          python3 - <<'PY'
+          import hashlib, pathlib, zipfile, plistlib, struct
+          ipa = pathlib.Path('dist/MoonGoat-unsigned.ipa')
+          digest = hashlib.sha256(ipa.read_bytes()).hexdigest()
+          assert digest == '022534d0b887fa1bde7c0fc3e86fa6fbfbd25e839d38f9625f77e00b2251d5f9'
+          with zipfile.ZipFile(ipa) as z:
+              assert z.testzip() is None
+              info = plistlib.loads(z.read('Payload/MoonGoat.app/Info.plist'))
+              assert info['CFBundleSupportedPlatforms'] == ['iPhoneOS']
+              assert info['CFBundleShortVersionString'] == '0.1.1'
+              binary = z.read('Payload/MoonGoat.app/' + info['CFBundleExecutable'])
+              assert struct.unpack('<II', binary[:8]) == (0xfeedfacf, 0x100000c)
+              assert not any('/_CodeSignature/' in n for n in z.namelist())
+              offset = 32
+              for _ in range(struct.unpack_from('<I', binary, 16)[0]):
+                  command, size = struct.unpack_from('<II', binary, offset)
+                  assert command != 0x1d
+                  offset += size
+          pathlib.Path('dist/MoonGoat-unsigned.ipa.sha256').write_text(digest + '  MoonGoat-unsigned.ipa' + chr(10))
+          PY
+      - name: Prepare draft and upload verified assets
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft > /tmp/release.json 2>/dev/null; then
+            python3 -c 'import json; assert json.load(open("/tmp/release.json"))["isDraft"], "Release already public; refusing overwrite"'
+          else
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --target "$RELEASE_COMMIT" --title 'MoonGoat v0.1.1 · iOS 预览版' --notes-file docs/releases/v0.1.1.md --prerelease --draft
+          fi
+          gh release upload "$RELEASE_TAG" dist/MoonGoat-unsigned.ipa dist/MoonGoat-unsigned.ipa.sha256 --repo "$GITHUB_REPOSITORY" --clobber
+      - name: Publish release
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease
