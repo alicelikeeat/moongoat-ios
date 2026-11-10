@@ -24,23 +24,87 @@ struct GlassPanel: ViewModifier {
 extension View {
     func moonGlass(radius: CGFloat = 24) -> some View { modifier(GlassPanel(radius: radius)) }
 }
+/// Shared native glass rendering lets nearby surfaces merge and separate.
+struct NativeGlassGroup<Content: View>: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    var spacing: CGFloat = 12
+    @ViewBuilder var content: Content
+    @ViewBuilder var body: some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *), !reduceTransparency {
+            GlassEffectContainer(spacing: spacing) { content }
+        } else { content }
+        #else
+        content
+        #endif
+    }
+}
+
+struct MorphGlass: ViewModifier {
+    var id: String
+    var namespace: Namespace.ID
+    var unionID: String? = nil
+    var radius: CGFloat = 12
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ViewBuilder func body(content: Content) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *), !reduceTransparency {
+            if reduceMotion {
+                content.glassEffect(.regular.tint(.mint.opacity(0.12)), in: .rect(cornerRadius: radius))
+            } else {
+                content
+                    .glassEffect(.regular.tint(.mint.opacity(0.12)).interactive(), in: .rect(cornerRadius: radius))
+                    .glassEffectID(id, in: namespace)
+                    .glassEffectUnion(id: unionID, namespace: namespace)
+                    .glassEffectTransition(.matchedGeometry)
+            }
+        } else { content.moonGlass(radius: radius) }
+        #else
+        content.moonGlass(radius: radius)
+        #endif
+    }
+}
+extension View {
+    func morphGlass(id: String, namespace: Namespace.ID, unionID: String? = nil, radius: CGFloat = 12) -> some View {
+        modifier(MorphGlass(id: id, namespace: namespace, unionID: unionID, radius: radius))
+    }
+}
+
+private struct BubbleSurface: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    var body: some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *), !reduceTransparency {
+            Color.clear.glassEffect(.regular.tint(.mint.opacity(0.05)), in: .circle)
+                .overlay(Circle().stroke(.white.opacity(0.12)))
+        } else { fallback }
+        #else
+        fallback
+        #endif
+    }
+    private var fallback: some View {
+        Circle().fill(reduceTransparency ? Color(white: 0.2) : Color.white.opacity(0.035))
+            .overlay(Circle().stroke(.white.opacity(0.15)))
+    }
+}
 struct BubbleField: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    var burst: Int = 0
+    @Environment(\.scenePhase) private var scenePhase
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 24, paused: reduceMotion)) { timeline in
-            Canvas { context, size in
+        TimelineView(.animation(minimumInterval: 1.0 / 20, paused: reduceMotion || scenePhase != .active)) { timeline in
+            GeometryReader { proxy in
                 let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
-                for index in 0..<18 {
-                    let radius = CGFloat(10 + index % 5 * 9)
-                    let x = (sin(time * 0.15 + Double(index) * 2.4) * 0.35 + 0.5) * size.width
-                    let phase = (time * (8 + Double(index % 3) * 4) + Double(index) * 57).truncatingRemainder(dividingBy: size.height + 100)
-                    let y = size.height + 50 - phase
-                    let rect = CGRect(x: x, y: y, width: radius * 2, height: radius * 2)
-                    let path = Path(ellipseIn: rect)
-                    context.fill(path, with: .color(.mint.opacity(0.025)))
-                    context.stroke(path, with: .color(.white.opacity(0.10)), lineWidth: 1)
-                    context.fill(Path(ellipseIn: CGRect(x: x + radius * 0.4, y: y + radius * 0.3, width: radius * 0.35, height: radius * 0.18)), with: .color(.white.opacity(0.22)))
+                NativeGlassGroup(spacing: 14) {
+                    ZStack {
+                        ForEach(0..<9, id: \.self) { index in
+                            let diameter = CGFloat(28 + index % 4 * 14)
+                            let x = (sin(time * 0.12 + Double(index) * 2.4) * 0.42 + 0.5) * proxy.size.width
+                            let phase = (time * (7 + Double(index % 3) * 3) + Double(index) * 87).truncatingRemainder(dividingBy: max(1, proxy.size.height + 120))
+                            BubbleSurface().frame(width: diameter, height: diameter)
+                                .position(x: x, y: proxy.size.height + 60 - phase)
+                        }
+                    }
                 }
             }
         }.allowsHitTesting(false).accessibilityHidden(true)

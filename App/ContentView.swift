@@ -6,6 +6,8 @@ struct ContentView: View {
     @ObservedObject var model: GameModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var cards
+    @Namespace private var glass
+    @State private var expandedTools = true
     @State private var showStudio = false
     @State private var showNew = false
     @State private var showHelp = false
@@ -14,7 +16,7 @@ struct ContentView: View {
             ZStack {
                 LinearGradient(colors: [Color(red: 0.08, green: 0.13, blue: 0.19), Color(red: 0.16, green: 0.13, blue: 0.25), Color(red: 0.06, green: 0.22, blue: 0.23)], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
                 Circle().fill(.purple.opacity(0.19)).blur(radius: 65).frame(width: 230).offset(x: 140, y: -230)
-                BubbleField(burst: model.celebration).ignoresSafeArea()
+                BubbleField().ignoresSafeArea()
                 VStack(spacing: 18) {
                     header
                     progress
@@ -26,11 +28,12 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 10)
                 .frame(maxWidth: 520).frame(maxWidth: .infinity)
-                if model.game.state.status != .playing { result }
+                if model.visibleState.status != .playing { result }
             }
-            .animation(reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.8), value: model.game.state)
+            .animation(reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.8), value: model.visibleState)
             .animation(reduceMotion ? nil : .easeInOut, value: model.hintID)
         }
+        .onChange(of: reduceMotion) { _, _ in model.finishAnimations() }
         .sheet(isPresented: $showStudio) { FaceStudio(model: model).presentationDetents([.large]) }
         .sheet(isPresented: $showHelp) { help.presentationDetents([.medium]) }
         .confirmationDialog("开始新局？当前进度将替换。", isPresented: $showNew, titleVisibility: .visible) {
@@ -60,23 +63,23 @@ struct ContentView: View {
                 HStack {
                     Text(model.theme.title).fontWeight(.medium)
                     Spacer()
-                    Text("\(model.game.state.matched) / \(model.game.state.matched + model.game.state.board.count + model.game.state.tray.count)").monospacedDigit()
+                    Text("\(model.visibleState.matched) / \(model.visibleState.matched + model.visibleState.board.count + model.visibleState.tray.count)").monospacedDigit()
                 }.font(.caption)
-                ProgressView(value: Double(model.game.state.matched), total: Double(model.game.state.matched + model.game.state.board.count + model.game.state.tray.count)).tint(.mint)
+                ProgressView(value: Double(model.visibleState.matched), total: Double(model.visibleState.matched + model.visibleState.board.count + model.visibleState.tray.count)).tint(.mint)
             }
         }.padding(16).moonGlass()
     }
     private var board: some View {
         GeometryReader { proxy in
-            let rows = (model.game.state.board.count + model.game.state.tray.count + model.game.state.matched) / 12
+            let rows = (model.visibleState.board.count + model.visibleState.tray.count + model.visibleState.matched) / 12
             let maxY = Double(rows - 1) * 1.08 + 0.44
             let unit = min((proxy.size.width - 12) / 4.64, (proxy.size.height - 8) / (maxY + 1.0))
             let offsetX = (proxy.size.width - unit * 4.64) / 2
             ZStack(alignment: .topLeading) {
                 Color.clear
-                ForEach(model.game.state.board.sorted { $0.layer < $1.layer }) { card in
+                ForEach(model.visibleState.board.sorted { $0.layer < $1.layer }) { card in
                     let available = model.game.isAvailable(card.id)
-                    Button { model.pick(card.id) } label: {
+                    Button { model.pick(card.id, animated: !reduceMotion) } label: {
                         face(card.kind)
                             .frame(width: unit * 0.96, height: unit * 0.96)
                             .background(available ? Color(red: 0.9, green: 0.95, blue: 0.88) : Color(red: 0.38, green: 0.45, blue: 0.45), in: .rect(cornerRadius: 13))
@@ -84,7 +87,7 @@ struct ContentView: View {
                             .shadow(color: .black.opacity(0.3), radius: 3, y: 5)
                             .opacity(available ? 1 : 0.7)
                     }
-                    .buttonStyle(.plain).disabled(!available || model.game.state.status != .playing)
+                    .buttonStyle(.plain).disabled(!available || model.visibleState.status != .playing || model.isAnimating)
                     .matchedGeometryEffect(id: card.id, in: cards)
                     .position(x: offsetX + (card.x + 0.48) * unit, y: (card.y + 0.48) * unit)
                     .zIndex(Double(card.layer))
@@ -98,7 +101,7 @@ struct ContentView: View {
             HStack {
                 Text("月光收集槽").font(.caption).foregroundStyle(.white.opacity(0.7))
                 Spacer()
-                Text("\(model.game.state.tray.count) / 7").font(.caption.monospacedDigit()).foregroundStyle(model.game.state.tray.count >= 5 ? .orange : .mint)
+                Text("\(model.visibleState.tray.count) / 7").font(.caption.monospacedDigit()).foregroundStyle(model.visibleState.tray.count >= 5 ? .orange : .mint)
             }
             GeometryReader { proxy in
                 let size = (proxy.size.width - 24) / 7
@@ -107,31 +110,55 @@ struct ContentView: View {
                         RoundedRectangle(cornerRadius: 9).fill(.black.opacity(0.15)).frame(width: size, height: size)
                     }
                 }
-                HStack(spacing: 4) {
-                    ForEach(model.game.state.tray) { card in
-                        face(card.kind).frame(width: size, height: size)
-                            .background(Color(red: 0.9, green: 0.95, blue: 0.88), in: .rect(cornerRadius: 9))
-                            .matchedGeometryEffect(id: card.id, in: cards)
-                            .transition(.scale.combined(with: .opacity))
+                NativeGlassGroup(spacing: 8) {
+                    HStack(spacing: 4) {
+                        ForEach(Array(model.visibleState.tray.enumerated()), id: \.element.id) { index, card in
+                            let merged = model.mergingIDs.contains(card.id)
+                            let matchingIndices = model.visibleState.tray.indices.filter { model.mergingIDs.contains(model.visibleState.tray[$0].id) }
+                            let center = matchingIndices.isEmpty ? index : matchingIndices[matchingIndices.count / 2]
+                            face(card.kind)
+                                .opacity(merged && index != center ? 0 : 1)
+                                .frame(width: size, height: size)
+                                .morphGlass(id: "tray-\(card.id)", namespace: glass, unionID: merged ? "matching-triple" : nil)
+                                .matchedGeometryEffect(id: card.id, in: cards)
+                                .scaleEffect(merged ? 0.9 : 1)
+                                .offset(x: merged ? CGFloat(center - index) * (size + 4) : 0)
+                                .zIndex(merged ? 1 : 0)
+                        }
                     }
                 }
             }.frame(height: 45)
-        }.padding(16).moonGlass()
+        }.padding(16)
+        .background(.black.opacity(0.12), in: .rect(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(.white.opacity(0.12)))
         .overlay { MatchBurst(trigger: model.celebration) }
         .sensoryFeedback(.success, trigger: model.celebration) { _, _ in model.haptics }
     }
     private var controls: some View {
-        HStack(spacing: 10) {
-            tool("撤回", icon: "arrow.uturn.backward", disabled: !model.game.canUndo) { model.undo() }
-            tool("洗牌 \(model.game.state.shufflesLeft)", icon: "shuffle", disabled: model.game.state.shufflesLeft == 0 || model.game.state.status != .playing) { model.shuffle() }
-            tool("提示", icon: "sparkles", disabled: model.game.state.status != .playing) { model.hint() }
-            tool("新局", icon: "arrow.clockwise") { showNew = true }
+        NativeGlassGroup(spacing: 16) {
+            HStack(spacing: 8) {
+                tool(expandedTools ? "收起" : "工具", icon: expandedTools ? "chevron.down" : "ellipsis", id: "expand") {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.72)) {
+                        expandedTools.toggle()
+                    }
+                }
+                tool("撤回", icon: "arrow.uturn.backward", id: "undo", disabled: !model.game.canUndo || model.isAnimating) { model.undo(animated: !reduceMotion) }
+                if expandedTools {
+                    tool("洗牌 \(model.visibleState.shufflesLeft)", icon: "shuffle", id: "shuffle", disabled: model.visibleState.shufflesLeft == 0 || model.visibleState.status != .playing || model.isAnimating) { model.shuffle() }
+                    tool("提示", icon: "sparkles", id: "hint", disabled: model.visibleState.status != .playing || model.isAnimating) { model.hint() }
+                }
+                tool("新局", icon: "arrow.clockwise", id: "new") { showNew = true }
+            }
         }
     }
-    private func tool(_ title: String, icon: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+    private func tool(_ title: String, icon: String, id: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 7) { Image(systemName: icon).font(.title3); Text(title).font(.caption2) }
-                .frame(maxWidth: .infinity).frame(minHeight: 66).moonGlass(radius: 20)
+            VStack(spacing: 7) {
+                Image(systemName: icon).font(.title3).contentTransition(.symbolEffect(.replace))
+                Text(title).font(.caption2)
+            }
+                .frame(maxWidth: .infinity).frame(minHeight: 66)
+                .morphGlass(id: "tool-" + id, namespace: glass, radius: 20)
         }.buttonStyle(.plain).foregroundStyle(disabled ? .white.opacity(0.3) : .white).disabled(disabled)
     }
     private func face(_ kind: Int) -> some View {
@@ -144,12 +171,12 @@ struct ContentView: View {
         ZStack {
             Color.black.opacity(0.55).ignoresSafeArea()
             VStack(spacing: 20) {
-                Text(model.game.state.status == .won ? "🌙" : "☁️").font(.system(size: 64))
-                Text(model.game.state.status == .won ? "今晚，你点亮了月亮" : "收集槽装满啦").font(.title2.bold())
-                Text(model.game.state.status == .won ? "让下一场月光，继续发生。" : "撤回一步，或换个思路重新出发。")
+                Text(model.visibleState.status == .won ? "🌙" : "☁️").font(.system(size: 64))
+                Text(model.visibleState.status == .won ? "今晚，你点亮了月亮" : "收集槽装满啦").font(.title2.bold())
+                Text(model.visibleState.status == .won ? "让下一场月光，继续发生。" : "撤回一步，或换个思路重新出发。")
                     .font(.subheadline).foregroundStyle(.secondary)
                 Button("再来一局") { showNew = true }.buttonStyle(.borderedProminent).tint(.mint).foregroundStyle(.black)
-                if model.game.canUndo { Button("撤回上一步") { model.undo() }.buttonStyle(.bordered) }
+                if model.game.canUndo { Button("撤回上一步") { model.undo(animated: !reduceMotion) }.buttonStyle(.bordered) }
                 Button("更换牌面") { showStudio = true }.font(.caption)
             }.padding(30).moonGlass(radius: 32).padding(24)
         }

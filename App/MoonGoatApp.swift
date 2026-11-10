@@ -8,7 +8,7 @@ struct MoonGoatApp: App {
         WindowGroup {
             ContentView(model: model)
                 .preferredColorScheme(.dark)
-                .onChange(of: phase) { _, value in if value != .active { model.save() } }
+                .onChange(of: phase) { _, value in if value != .active { model.finishAnimations(); model.save() } }
         }
     }
 }

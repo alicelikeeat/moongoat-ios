@@ -49,7 +49,7 @@ SwiftUI iOS 26 API 放在 `compiler(>=6.2)` 与 `#available(iOS 26.0, *)` 分支
 swift test
 ```
 
-8 项 XCTest 覆盖：100 Seed 确定性、100 Seed × 3 种大小的完整通关路线、遮挡失败零修改、三张消除/撤回/胜利、七格失败恢复、第七张先消除再判负、洗牌守恒与次数、存档序列化和非法数据拒绝。
+11 项 XCTest 覆盖：100 Seed 确定性、100 Seed × 3 种大小的完整通关路线、遮挡失败零修改、三张消除/撤回/胜利、七格失败恢复、第七张先消除再判负、洗牌守恒与次数、存档序列化和非法数据拒绝；合并临时表现、反向分离数据、通关结算时机。
 
 UI 代码已通过 Xcode 26.6 的 arm64 iPhoneOS Release 编译。完整状态和风险见 [验收记录](docs/validation.md)。
 
@@ -66,3 +66,9 @@ UI 代码已通过 Xcode 26.6 的 arm64 iPhoneOS Release 编译。完整状态�
 - `tools`：工程生成、未签名构建与验证打包。
 
 Documents/MoonGoat/session.json 使用版本 1 的 JSON、原子替换。损坏存档保留原文件并暂停写入；明确开始新局前备份损坏文件。撤销历史仅在本次会话有效，不跨重启保存。提示不是自动解法，洗牌后不保证有解。无广告、账号、服务器或数据上传。
+
+## 0.1.1 原生动效
+
+`GlassEffectContainer`、`glassEffectID`、`glassEffectUnion`、`glassEffectTransition(.matchedGeometry)` 和 `Glass.interactive()` 在 iOS 26 / Swift 6.2+ 分支启用。背景气泡使用原生玻璃圆形，靠近时由系统融合；iOS 17–18 使用 SwiftUI 形状、材质和弹簧动画回退。
+
+`PickPresentation` 只用于 UI 的瞬时画面：规则与存档即时完成，画面随后播放入槽、合并和消散。动画期间防止重复操作；开始新局、退到后台或改变“减少动态效果”偏好时取消表现任务，显示已完成状态。开启减少动态效果会跳过合并/分离并暂停漂浮气泡。存档格式仍为 1，兼容已有牌局。

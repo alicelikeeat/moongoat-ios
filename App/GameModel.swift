@@ -10,6 +10,11 @@ import ImageIO
     @Published var hintID: Int?
     @Published var celebration = 0
     @Published var haptics = true
+    @Published private(set) var animationState: GameState?
+    @Published private(set) var mergingIDs: Set<Int> = []
+    @Published private(set) var isAnimating = false
+    var visibleState: GameState { animationState ?? game.state }
+    private var animationTask: Task<Void, Never>?
     private var savesBlocked = false
     private let directory: URL
     private let saveURL: URL
@@ -44,6 +49,7 @@ import ImageIO
         } catch { notice = "保存失败：\(error.localizedDescription)" }
     }
     func newGame(rows: Int = 4) {
+        finishAnimations()
         if savesBlocked, FileManager.default.fileExists(atPath: saveURL.path) {
             do {
                 try FileManager.default.copyItem(at: saveURL, to: directory.appending(path: "unreadable-\(UUID().uuidString).json"))
@@ -54,21 +60,97 @@ import ImageIO
         hintID = nil
         save()
     }
-    func pick(_ id: Int) {
+    // Cancel only presentation. The game and save always contain a complete transaction.
+    func finishAnimations() {
+        animationTask?.cancel()
+        animationTask = nil
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            animationState = nil
+            mergingIDs = []
+            isAnimating = false
+        }
+    }
+    func pick(_ id: Int, animated: Bool = true) {
+        guard !isAnimating else { return }
+        let before = game.state
         do {
             let count = try game.pick(id)
             hintID = nil
-            if haptics { UIImpactFeedbackGenerator(style: count > 0 ? .medium : .light).impactOccurred() }
-            if count > 0 { celebration += 1 }
             save()
+            if haptics { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+            guard animated, count == 3,
+                  let plan = PickPresentation(before: before, after: game.state, pickedID: id) else {
+                if count > 0 { celebration += 1 }
+                return
+            }
+            animationState = plan.collected
+            isAnimating = true
+            animationTask = Task { @MainActor [weak self] in
+                do {
+                    try await Task.sleep(for: .milliseconds(280))
+                    guard let self, !Task.isCancelled else { return }
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.76)) {
+                        self.mergingIDs = plan.matchingIDs
+                    }
+                    try await Task.sleep(for: .milliseconds(330))
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        self.animationState = nil
+                        self.mergingIDs = []
+                        self.celebration += 1
+                    }
+                    try await Task.sleep(for: .milliseconds(160))
+                    guard !Task.isCancelled else { return }
+                    self.isAnimating = false
+                    self.animationTask = nil
+                } catch { /* finishAnimations owns cleanup after cancellation. */ }
+            }
         } catch { if haptics { UINotificationFeedbackGenerator().notificationOccurred(.warning) } }
     }
-    func undo() { game.undo(); hintID = nil; save() }
+    func undo(animated: Bool = true) {
+        guard !isAnimating, game.canUndo else { return }
+        let committed = game.state
+        game.undo()
+        hintID = nil
+        save()
+        guard animated,
+              let returned = game.state.board.first(where: { card in !committed.board.contains(where: { $0.id == card.id }) }),
+              let plan = PickPresentation(before: game.state, after: committed, pickedID: returned.id),
+              !plan.matchingIDs.isEmpty else { return }
+        isAnimating = true
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            animationState = plan.collected
+            mergingIDs = plan.matchingIDs
+        }
+        animationTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(30))
+                guard let self, !Task.isCancelled else { return }
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    self.mergingIDs = []
+                }
+                try await Task.sleep(for: .milliseconds(380))
+                guard !Task.isCancelled else { return }
+                withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
+                    self.animationState = nil
+                }
+                try await Task.sleep(for: .milliseconds(280))
+                guard !Task.isCancelled else { return }
+                self.isAnimating = false
+                self.animationTask = nil
+            } catch { }
+        }
+    }
     func shuffle() {
+        guard !isAnimating else { return }
         do { try game.shuffle(); hintID = nil; save() }
         catch { notice = "本局的洗牌次数已用完。" }
     }
-    func hint() { hintID = game.hint() }
+    func hint() { guard !isAnimating else { return }; hintID = game.hint() }
     func importFace(_ data: Data, kind: Int) {
         guard (0..<8).contains(kind), data.count <= 10 * 1024 * 1024,
             let source = CGImageSourceCreateWithData(data as CFData, nil), CGImageSourceGetCount(source) == 1,
