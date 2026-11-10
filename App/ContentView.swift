@@ -37,9 +37,9 @@ struct ContentView: View {
         .sheet(isPresented: $showStudio) { FaceStudio(model: model).presentationDetents([.large]) }
         .sheet(isPresented: $showHelp) { help.presentationDetents([.medium]) }
         .confirmationDialog("开始新局？当前进度将替换。", isPresented: $showNew, titleVisibility: .visible) {
-            Button("轻松 · 36 张") { model.newGame(rows: 3) }
-            Button("标准 · 48 张") { model.newGame(rows: 4) }
-            Button("挑战 · 60 张") { model.newGame(rows: 5) }
+            Button("轻松 · 108 张 · 12 类") { model.newGame(difficulty: .relaxed) }
+            Button("标准 · 240 张 · 16 类") { model.newGame(difficulty: .standard) }
+            Button("挑战 · 360 张 · 20 类") { model.newGame(difficulty: .expert) }
         }
         .alert("MoonGoat", isPresented: Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })) {
             Button("知道了") { model.notice = nil }
@@ -61,7 +61,7 @@ struct ContentView: View {
             Image(systemName: "moon.stars.fill").foregroundStyle(.mint).symbolEffect(.bounce, value: model.celebration)
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text(model.theme.title).fontWeight(.medium)
+                    Text("剩余 \(model.visibleState.board.count) 张 · \(model.visibleState.kindCount) 类").fontWeight(.medium)
                     Spacer()
                     Text("\(model.visibleState.matched) / \(model.visibleState.matched + model.visibleState.board.count + model.visibleState.tray.count)").monospacedDigit()
                 }.font(.caption)
@@ -71,25 +71,26 @@ struct ContentView: View {
     }
     private var board: some View {
         GeometryReader { proxy in
-            let rows = (model.visibleState.board.count + model.visibleState.tray.count + model.visibleState.matched) / 12
-            let maxY = Double(rows - 1) * 1.08 + 0.44
-            let unit = min((proxy.size.width - 12) / 4.64, (proxy.size.height - 8) / (maxY + 1.0))
-            let offsetX = (proxy.size.width - unit * 4.64) / 2
+            let bounds = model.visibleState.boardBounds
+            let unit = min((proxy.size.width - 8) / bounds.width, (proxy.size.height - 8) / bounds.height)
+            let offsetX = (proxy.size.width - unit * bounds.width) / 2
+            let offsetY = (proxy.size.height - unit * bounds.height) / 2
             ZStack(alignment: .topLeading) {
                 Color.clear
                 ForEach(model.visibleState.board.sorted { $0.layer < $1.layer }) { card in
                     let available = model.game.isAvailable(card.id)
                     Button { model.pick(card.id, animated: !reduceMotion) } label: {
-                        face(card.kind)
+                        face(card.kind, size: max(16, unit * 0.56))
                             .frame(width: unit * 0.96, height: unit * 0.96)
                             .background(available ? Color(red: 0.9, green: 0.95, blue: 0.88) : Color(red: 0.38, green: 0.45, blue: 0.45), in: .rect(cornerRadius: 13))
                             .overlay(RoundedRectangle(cornerRadius: 13).stroke(model.hintID == card.id ? .mint : .white.opacity(available ? 0.6 : 0.1), lineWidth: model.hintID == card.id ? 3 : 1))
-                            .shadow(color: .black.opacity(0.3), radius: 3, y: 5)
+                            .background(RoundedRectangle(cornerRadius: 13).fill(Color(red: 0.29, green: 0.39, blue: 0.32)).offset(y: 3))
+                            .shadow(color: .black.opacity(0.35), radius: 1.5, y: 2)
                             .opacity(available ? 1 : 0.7)
                     }
                     .buttonStyle(.plain).disabled(!available || model.visibleState.status != .playing || model.isAnimating)
                     .matchedGeometryEffect(id: card.id, in: cards)
-                    .position(x: offsetX + (card.x + 0.48) * unit, y: (card.y + 0.48) * unit)
+                    .position(x: offsetX + (card.x + 0.48) * unit, y: offsetY + (card.y + 0.48) * unit)
                     .zIndex(Double(card.layer))
                     .accessibilityLabel("\(model.theme.symbols[card.kind])牌，\(available ? "可选择" : "被覆盖")")
                 }
@@ -161,10 +162,10 @@ struct ContentView: View {
                 .morphGlass(id: "tool-" + id, namespace: glass, radius: 20)
         }.buttonStyle(.plain).foregroundStyle(disabled ? .white.opacity(0.3) : .white).disabled(disabled)
     }
-    private func face(_ kind: Int) -> some View {
+    private func face(_ kind: Int, size: CGFloat = 29) -> some View {
         Group {
             if let image = model.customFaces[kind] { Image(uiImage: image).resizable().scaledToFit().padding(5) }
-            else { Text(model.theme.symbols[kind]).font(.system(size: 29)).minimumScaleFactor(0.5) }
+            else { Text(model.theme.symbols[kind]).font(.system(size: size)).minimumScaleFactor(0.5) }
         }
     }
     private var result: some View {
@@ -184,7 +185,7 @@ struct ContentView: View {
     private var help: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("一小片月光，一点小策略").font(.title2.bold())
-            Text("点击未被上层覆盖的牌，将它放入七格收集槽。三张同类牌会自动消除；先消除，再判定满槽。清空所有牌即可通关。")
+            Text("点击未被上层覆盖的牌，将它放入七格收集槽。三张同类牌会自动消除；先消除，再判定满槽。清空所有牌即可通关。下方两侧是储备牌堆，同样只能从顶层拿牌。")
             Text("提示会优先照顾槽中已有的牌，不是通关解法。初始牌局保证有解；洗牌后不保证。撤回可以恢复消除和洗牌。")
                 .font(.subheadline).foregroundStyle(.secondary)
             Toggle("触感反馈", isOn: $model.haptics)

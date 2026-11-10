@@ -31,7 +31,7 @@ import ImageIO
                 guard envelope.version == 1 else { throw GameError.invalidSave }
                 game = try Game(restoring: envelope.game)
             }
-            for kind in 0..<8 {
+            for kind in 0..<CardCatalog.kindCount {
                 let url = directory.appending(path: "face-\(kind).png")
                 if let image = UIImage(contentsOfFile: url.path) { customFaces[kind] = image }
             }
@@ -48,7 +48,7 @@ import ImageIO
             try data.write(to: saveURL, options: .atomic)
         } catch { notice = "保存失败：\(error.localizedDescription)" }
     }
-    func newGame(rows: Int = 4) {
+    func newGame(difficulty: BoardDifficulty = .standard) {
         finishAnimations()
         if savesBlocked, FileManager.default.fileExists(atPath: saveURL.path) {
             do {
@@ -56,7 +56,7 @@ import ImageIO
             } catch { notice = "无法备份旧存档，未开始新局。"; return }
         }
         savesBlocked = false
-        game = Game(seed: UInt64.random(in: 1...UInt64.max), rows: rows)
+        game = Game(seed: UInt64.random(in: 1...UInt64.max), difficulty: difficulty)
         hintID = nil
         save()
     }
@@ -152,7 +152,7 @@ import ImageIO
     }
     func hint() { guard !isAnimating else { return }; hintID = game.hint() }
     func importFace(_ data: Data, kind: Int) {
-        guard (0..<8).contains(kind), data.count <= 10 * 1024 * 1024,
+        guard (0..<CardCatalog.kindCount).contains(kind), data.count <= 10 * 1024 * 1024,
             let source = CGImageSourceCreateWithData(data as CFData, nil), CGImageSourceGetCount(source) == 1,
             let info = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
             let width = info[kCGImagePropertyPixelWidth] as? Int,
@@ -186,9 +186,9 @@ enum FaceTheme: String, CaseIterable, Identifiable {
     var title: String { switch self { case .meadow: "月光牧场"; case .cosmic: "宇宙漫游"; case .picnic: "午后野餐" } }
     var symbols: [String] {
         switch self {
-        case .meadow: ["🐑", "🍀", "🍄", "🌼", "🥕", "🦋", "🍓", "🌱"]
-        case .cosmic: ["🌙", "🪐", "🚀", "⭐️", "☄️", "🛸", "🌎", "👾"]
-        case .picnic: ["🍒", "🥨", "🧁", "🍋", "🥑", "🍑", "🍉", "🍪"]
+        case .meadow: ["🐑", "🍀", "🍄", "🌼", "🥕", "🦋", "🍓", "🌱", "🌽", "🧶", "🐝", "🍎", "🌻", "🪵", "🪣", "🐞", "🌰", "🪺", "🍐", "🌵"]
+        case .cosmic: ["🌙", "🪐", "🚀", "⭐️", "☄️", "🛸", "🌎", "👾", "☀️", "🛰️", "🔭", "🧑‍🚀", "💎", "🧲", "⚡️", "🧪", "🤖", "🔋", "🌀", "🧭"]
+        case .picnic: ["🍒", "🥨", "🧁", "🍋", "🥑", "🍑", "🍉", "🍪", "🍇", "🧀", "🍍", "🥝", "🥐", "🍩", "🍌", "🍔", "🍕", "🍭", "🥥", "🥦"]
         }
     }
 }

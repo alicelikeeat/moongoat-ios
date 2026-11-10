@@ -37,7 +37,7 @@ for mode in ['Debug', 'Release']:
     target_configs.append(obj('target-' + mode, f'''isa = XCBuildConfiguration; name = {mode}; buildSettings = {{
         PRODUCT_NAME = MoonGoat; PRODUCT_BUNDLE_IDENTIFIER = app.moongoat.ios;
         INFOPLIST_FILE = Resources/Info.plist; GENERATE_INFOPLIST_FILE = NO;
-        MARKETING_VERSION = 0.1.1; CURRENT_PROJECT_VERSION = 2;
+        MARKETING_VERSION = 0.1.2; CURRENT_PROJECT_VERSION = 3;
         TARGETED_DEVICE_FAMILY = 1; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
         SUPPORTS_MACCATALYST = NO; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
         SWIFT_OPTIMIZATION_LEVEL = "{optimization}"; CODE_SIGN_STYLE = Automatic;

@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import MoonGoatCore
 
 struct FaceStudio: View {
     @ObservedObject var model: GameModel
@@ -21,7 +22,7 @@ struct FaceStudio: View {
                         ForEach(FaceTheme.allCases) { Text($0.title).tag($0) }
                     }.pickerStyle(.segmented)
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 14) {
-                        ForEach(0..<8, id: \.self) { kind in
+                        ForEach(0..<CardCatalog.kindCount, id: \.self) { kind in
                             VStack(spacing: 12) {
                                 Group {
                                     if let image = model.customFaces[kind] { Image(uiImage: image).resizable().scaledToFit() }

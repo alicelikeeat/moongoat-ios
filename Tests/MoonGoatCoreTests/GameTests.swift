@@ -5,22 +5,19 @@ final class GameTests: XCTestCase {
         for seed in 0..<100 {
             let game = Game(seed: UInt64(seed))
             XCTAssertEqual(game.state, Game(seed: UInt64(seed)).state)
-            XCTAssertEqual(game.state.board.count, 48)
+            XCTAssertEqual(game.state.board.count, 240)
             XCTAssertTrue(Dictionary(grouping: game.state.board, by: \.kind).values.allSatisfy { $0.count % 3 == 0 })
             XCTAssertTrue(game.state.board.contains { game.isAvailable($0.id) })
         }
     }
     func testGeneratedWinningRouteFor100SeedsAndAllSizes() throws {
-        for rows in 3...5 {
+        for difficulty in BoardDifficulty.allCases {
             for seed in 0..<100 {
-                var game = Game(seed: UInt64(seed), rows: rows)
-                var rng = SeededRandom(seed: UInt64(seed))
-                while !game.state.board.isEmpty {
-                    let available = game.state.board.filter { game.isAvailable($0.id) }
-                    let card = available[Int(rng.next() % UInt64(available.count))]
-                    try game.pick(card.id)
-                }
-                XCTAssertEqual(game.state.status, .won, "seed \(seed) rows \(rows)")
+                let generated = BoardGenerator.generate(seed: UInt64(seed), difficulty: difficulty)
+                var game = Game(seed: UInt64(seed), difficulty: difficulty)
+                for id in generated.winningRoute { try game.pick(id) }
+                XCTAssertEqual(game.state.status, .won, "seed \(seed) difficulty \(difficulty)")
+                XCTAssertEqual(game.state.matched, difficulty.cardCount)
             }
         }
     }

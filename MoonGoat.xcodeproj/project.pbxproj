@@ -27,7 +27,7 @@ E2AA269EB967A8853A258BFA = { isa = PBXFrameworksBuildPhase; buildActionMask = 21
 952548237D7F645F11D1E7B6 = { isa = XCBuildConfiguration; name = Debug; buildSettings = {
         PRODUCT_NAME = MoonGoat; PRODUCT_BUNDLE_IDENTIFIER = app.moongoat.ios;
         INFOPLIST_FILE = Resources/Info.plist; GENERATE_INFOPLIST_FILE = NO;
-        MARKETING_VERSION = 0.1.1; CURRENT_PROJECT_VERSION = 2;
+        MARKETING_VERSION = 0.1.2; CURRENT_PROJECT_VERSION = 3;
         TARGETED_DEVICE_FAMILY = 1; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
         SUPPORTS_MACCATALYST = NO; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
         SWIFT_OPTIMIZATION_LEVEL = "-Onone"; CODE_SIGN_STYLE = Automatic;
@@ -36,7 +36,7 @@ E2AA269EB967A8853A258BFA = { isa = PBXFrameworksBuildPhase; buildActionMask = 21
 E2D3A31BEAA1368FC62DA77A = { isa = XCBuildConfiguration; name = Release; buildSettings = {
         PRODUCT_NAME = MoonGoat; PRODUCT_BUNDLE_IDENTIFIER = app.moongoat.ios;
         INFOPLIST_FILE = Resources/Info.plist; GENERATE_INFOPLIST_FILE = NO;
-        MARKETING_VERSION = 0.1.1; CURRENT_PROJECT_VERSION = 2;
+        MARKETING_VERSION = 0.1.2; CURRENT_PROJECT_VERSION = 3;
         TARGETED_DEVICE_FAMILY = 1; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
         SUPPORTS_MACCATALYST = NO; ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
         SWIFT_OPTIMIZATION_LEVEL = "-O"; CODE_SIGN_STYLE = Automatic;
